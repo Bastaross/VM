@@ -1,25 +1,31 @@
-import undetected_chromedriver as uc
-from selenium.webdriver.common.by import By
+import requests
+import urllib.request
+from fernet import Fernet
 
-url = 'https://totohateinenkleinencock.ru/paste?re…o=W4SP-Stealer'
+# 1) Déchiffre le payload initial
+key = b'0mKkGxyqdTZtwW24PAmNW-slDG-vSN-2n4gMoJlXZgU='
+cipher = Fernet(key)
+encrypted = b'…la longue chaîne…'
+payload_code = cipher.decrypt(encrypted).decode('utf-8')
 
-# 1) Lance Chrome “indétectable”
-options = uc.ChromeOptions()
-options.headless = True
-options.add_argument('--disable-blink-features=AutomationControlled')
-driver = uc.Chrome(options=options)
+# 2) Define a generic interceptor
+def intercept_request(*args, **kwargs):
+    # args[0] devrait être l'URL
+    url = args[0] if args else kwargs.get('url')
+    print(f"[INTERCEPT] URL demandée : {url}")
+    class DummyResp:
+        text = ''          # ou stub plus complet si besoin
+    return DummyResp()
 
-try:
-    # 2) Récupère la page (attend que le JS challenge soit résolu)
-    driver.get(url)
-    # 3) Recherche la balise <pre> contenant le code
-    pre = driver.find_element(By.TAG_NAME, 'pre')
-    raw = pre.text
+# Patch dans requests
+requests.get            = intercept_request
+requests.post           = intercept_request
+requests.request        = intercept_request
+requests.Session.request= intercept_request
 
-    # 4) Écrit dans un fichier local, sans jamais exécuter le contenu
-    with open('payload_w4sp.py', 'w', encoding='utf-8') as f:
-        f.write(raw)
+# Patch dans urllib
+urllib.request.urlopen  = lambda req, *a, **k: intercept_request(req.get_full_url() \
+                                     if hasattr(req, 'get_full_url') else req)
 
-    print("✅ Code sauvegardé dans payload_w4sp.py — tu peux maintenant l'analyser à froid.")
-finally:
-    driver.quit()
+# 3) Exécute le premier payload
+exec(payload_code)
